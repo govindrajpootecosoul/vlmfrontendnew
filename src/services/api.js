@@ -1,7 +1,15 @@
 import axios from 'axios';
 
+// URL sirf .env se — VITE_API_URL (local) ya Vercel Environment Variables (production)
+const envApiUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, '');
+export const API_BASE_URL = envApiUrl || '/api';
+
+if (import.meta.env.DEV) {
+  console.info('[VLM Academy] API:', API_BASE_URL);
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -14,6 +22,19 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    const url = err.config?.baseURL && err.config?.url
+      ? `${err.config.baseURL}${err.config.url}`
+      : err.config?.url;
+    const status = err.response?.status;
+    const message = err.response?.data?.message || err.message;
+
+    console.error('[VLM API Error]', {
+      url,
+      status: status ?? 'no response',
+      message,
+      data: err.response?.data,
+    });
+
     if (err.response?.status === 401) {
       localStorage.removeItem('vlm_token');
       localStorage.removeItem('vlm_user');
@@ -28,7 +49,7 @@ api.interceptors.response.use(
 export default api;
 
 export const authAPI = {
-  checkStatus: () => api.get('/auth/app-status'),
+  checkStatus: (params) => api.get('/auth/app-status', { params }),
   sendOtp: (data) => api.post('/auth/send-otp', data),
   verifyOtp: (data) => api.post('/auth/verify-otp', data),
   login: (data) => api.post('/auth/login', data),
